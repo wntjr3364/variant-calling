@@ -3,15 +3,11 @@
 ## Overview
 This repository contains a Snakemake-based workflow for genomic variant calling, including quality control, alignment, and variant detection. The pipeline is designed to automatically detect paired-end read files in the specified folder and process them sequentially.
 
----
-
 ## Features
 - **Automatic Input Detection**: Detects all paired-end read files in the `trim_data/` directory.
 - **End-to-End Automation**: Includes all steps from quality control to variant calling.
 - **Reproducibility**: Ensures consistent results with a fully automated workflow.
 - **Parallel Processing**: Leverages multiple CPU cores for faster processing.
-
----
 
 ## Workflow
 The pipeline consists of the following steps:
@@ -22,8 +18,6 @@ The pipeline consists of the following steps:
 5. **Base Quality Recalibration**: Recalibrate base quality scores with GATK.
 6. **Variant Calling**: Detect SNPs and InDels using GATK HaplotypeCaller.
 
----
-
 ## Dependencies
 * FastQC: Quality control of raw reads.
 * Trimmomatic: Quality trimming of raw reads.
@@ -31,8 +25,6 @@ The pipeline consists of the following steps:
 * BWA: Alignment of reads to the reference genome.
 * Picard: Post-alignment processing.
 * GATK: Variant calling and base recalibration.
-
----
 
 ## Installation
 1. Install Snakemake and other dependencies:
