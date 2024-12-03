@@ -3,9 +3,6 @@
 # Configurations
 configfile: "config.yaml"
 
-import os
-import glob
-
 # Get all fastq files
 ALL_FASTQ, = glob_wildcards("read/{fname}.fastq.gz")
 SAMPLES = []
