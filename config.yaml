@@ -1,0 +1,22 @@
+
+# Reference Genome Configuration
+reference: "Gmax_275_v2.0.Mt.Pltd.fa"
+known_sites: "dbsnp.vcf"
+
+# Variant Calling Parameters
+variant_calling:
+  stand_call_conf: 30
+  max_alternate_alleles: 10
+  min_base_quality: 10
+  min_mapping_quality: 20
+
+# Quality Control Parameters
+trimmomatic:
+  leading: 3
+  trailing: 3
+  slidingwindow: "4:5"
+  minlen: 90
+
+# Resource Parameters
+threads: 8
+memory: "16g"
