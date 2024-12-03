@@ -1,79 +1,119 @@
-# Variant Calling Pipeline
+# Genomic Variant Calling Pipeline
 
 ## Overview
-This repository contains a Snakemake-based workflow for genomic variant calling, including quality control, alignment, and variant detection. The pipeline is designed to automatically detect paired-end read files in the specified folder and process them sequentially.
 
-## Features
-- **Automatic Input Detection**: Detects all paired-end read files in the `trim_data/` directory.
-- **End-to-End Automation**: Includes all steps from quality control to variant calling.
-- **Reproducibility**: Ensures consistent results with a fully automated workflow.
-- **Parallel Processing**: Leverages multiple CPU cores for faster processing.
+This Snakemake-based workflow automates the process of genomic variant calling, providing a comprehensive pipeline for processing paired-end sequencing data. The workflow includes quality control, read alignment, post-alignment processing, and variant detection.
 
-## Workflow
-The pipeline consists of the following steps:
-1. **Quality Control**: Run FastQC to generate quality reports for raw reads.
-2. **Reference Genome Preparation**: Index the reference genome for alignment and variant calling.
-3. **Read Alignment**: Align reads to the reference genome using BWA-MEM.
-4. **Post-alignment Processing**: Mark duplicates and sort BAM files using Picard.
-5. **Base Quality Recalibration**: Recalibrate base quality scores with GATK.
-6. **Variant Calling**: Detect SNPs and InDels using GATK HaplotypeCaller.
+## Prerequisites
 
-## Dependencies
-* FastQC: Quality control of raw reads.
-* Trimmomatic: Quality trimming of raw reads.
-* SAMtools: BAM file handling and depth calculation.
-* BWA: Alignment of reads to the reference genome.
-* Picard: Post-alignment processing.
-* GATK: Variant calling and base recalibration.
+### Software Dependencies
+
+- [Snakemake](https://snakemake.readthedocs.io/)
+- [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
+- [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)
+- [SAMtools](http://www.htslib.org/)
+- [BWA](http://bio-bwa.sourceforge.net/)
+- [Picard Tools](https://broadinstitute.github.io/picard/)
+- [GATK](https://gatk.broadinstitute.org/)
+
+### System Requirements
+
+- Linux/Unix environment
+- Conda (recommended for dependency management)
+- Minimum 16 GB RAM
+- Multi-core processor (recommended)
 
 ## Installation
-1. Install Snakemake and other dependencies:
-   ```bash
-   conda install -c bioconda snakemake bwa trimmomatic picard gatk samtools fastqc
-2. Clone the repository:
-    ```bash
-    git clone https://github.com/username/variant-calling-pipeline.git
-    cd variant-calling-pipeline
-3. Ensure that your reference genome and read files are in the appropriate directories:
-    * Reference genome: Place in the reference/ directory.
-    * Read files: Place in the trim_data/ directory.
 
+1. Install Conda (if not already installed)
+   ```bash
+   wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+   bash Miniconda3-latest-Linux-x86_64.sh
+   ```
+
+2. Create and activate a Conda environment
+   ```bash
+   conda create -n variant-calling
+   conda activate variant-calling
+   ```
+
+3. Install dependencies
+   ```bash
+   conda install -c bioconda snakemake bwa trimmomatic picard gatk4 samtools fastqc
+   ```
+
+4. Clone the repository
+   ```bash
+   git clone https://github.com/username/variant-calling-pipeline.git
+   cd variant-calling-pipeline
+   ```
+
+## Preparation
+
+### Reference Genome and Known Sites
+
+1. Place your reference genome in the `reference/` directory
+   - Example: `reference/Gmax_275_v2.0.Mt.Pltd.fa`
+
+2. Prepare known variant sites VCF file
+   - Example: `reference/known_sites.vcf`
+
+### Input Data
+
+Place your sequencing data in the `read/` directory:
+- Paired-end files: `sample_1P.fq.gz` and `sample_2P.fq.gz`
+- Single-end files: `sample.fq.gz`
+
+## Configuration
+
+Update `config.yaml` with your specific settings:
+
+```yaml
+reference: "reference/Gmax_275_v2.0.Mt.Pltd.fa"
+known_sites: "reference/known_sites.vcf"
+```
+
+
+## Workflow Steps
+
+1. Quality Control (FastQC)
+2. Read Trimming (Trimmomatic)
+3. Reference Genome Indexing
+4. Read Alignment (BWA-MEM)
+5. Duplicate Marking (Picard)
+6. Base Quality Score Recalibration (GATK)
+7. Variant Calling (GATK)
+8. Joint Variant Calling (GATK)
 
 ## Usage
-1. Place your FASTQ files in the trim_data/ directory:
-    * Single-end format: sample.fq.gz
-    * Paired-end format: sample_1P.fq.gz and sample_2P.fq.gz
-2. Update config.yaml with the reference genome and known variant sites.
-    ```bash
-    reference: "reference/Gmax_275_v2.0.Mt.Pltd.fa"
-    known_sites: "reference/known_sites.vcf"
-3. Run the workflow
-    ```bash
-    snakemake --cores 8
-    To generate specific ouputs, specify the target:
-    ```bash
-    snakemake variants/SRR12345.vcf --cores 8
 
+### Run Full Pipeline
 
-## Output
-* Aligned BAM files: Stored in aligned/.
-* Recalibrated BAM files: Stored in bqsr/.
-* VCF files: Final variant calls saved in variants/.
+```bash
+snakemake --cores 8
+```
 
-## Directory Structure
-The expected directory structure after running the pipeline is as follows:
-```plaintext
-.
-├── Snakefile           # Workflow definition
-├── config.yaml         # Configuration file
-├── reference/          # Reference genome and index files
-│   ├── Gmax_275_v2.0.Mt.Pltd.fa
-│   ├── known_sites.vcf
-├── trim_data/          # Input read files
-│   ├── SRR12345_1P.fq.gz
-│   ├── SRR12345_2P.fq.gz
-├── qc_reports/         # FastQC reports
-├── aligned/            # Aligned BAM files
-├── bqsr/               # Recalibrated BAM files
-├── variants/           # VCF files
-├── log/                # Logs for each step
+### Run Specific Targets
+
+```bash
+# Generate alignment for a specific sample
+snakemake result/alignment/sample.bam --cores 8
+
+# Generate variants for a specific sample
+snakemake result/variants/sample.vcf --cores 8
+```
+
+## Output Directory Structure
+
+```
+variant-calling-pipeline/
+├── reference/          # Reference genome files
+├── read/               # Input sequencing data
+├── log/
+│   ├── trim/           # Trimming logs
+│   ├── alignment/      # Alignment logs
+│   └── variants/       # Variant calling logs
+└── result/
+    ├── trim/           # Trimmed reads
+    ├── alignment/      # Aligned BAM files
+    └── variants/       # Variant call VCF files
