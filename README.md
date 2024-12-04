@@ -12,7 +12,7 @@ This Snakemake-based workflow provides an automated and comprehensive solution f
 - [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)
 - [SAMtools](http://www.htslib.org/)
 - [BWA](http://bio-bwa.sourceforge.net/)
-- [Picard Tools](https://broadinstitute.github.io/picard/)
+- [Picard](https://broadinstitute.github.io/picard/)
 - [GATK](https://gatk.broadinstitute.org/)
 
 ### System Requirements
@@ -130,8 +130,8 @@ snakemake result/trim/{sample}_trimmed.fastq.gz --cores 8
 # Generate alignment
 snakemake result/alignment/sample.bam --cores 8
 
-# Generate variants
-snakemake result/genotype_gvcf/combined_genotyped.vcf.gz --cores 8
+# Generate gvcf
+snakemake result/haplotype_caller/sample.g.vcf.gz --cores 8
 ```
 
 ## Output Directory Structure
