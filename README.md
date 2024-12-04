@@ -1,15 +1,14 @@
 # Genomic Variant Calling Pipeline
 
 ## Overview
+This Snakemake-based workflow provides an automated and comprehensive solution for genomic variant discovery, designed to process both single and paired-end sequencing data.
 
-This Snakemake-based workflow automates the process of genomic variant calling, providing a comprehensive pipeline for processing paired-end sequencing data. The workflow includes quality control, read alignment, post-alignment processing, and variant detection.
 
 ## Prerequisites
 
 ### Software Dependencies
 
 - [Snakemake](https://snakemake.readthedocs.io/)
-- [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
 - [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)
 - [SAMtools](http://www.htslib.org/)
 - [BWA](http://bio-bwa.sourceforge.net/)
@@ -22,30 +21,59 @@ This Snakemake-based workflow automates the process of genomic variant calling, 
 - Conda (recommended for dependency management)
 - Minimum 16 GB RAM
 - Multi-core processor (recommended)
+- Java 8 (JDK 1.8)
 
 ## Installation
 
-1. Install Conda (if not already installed)
+1. Install Java 8
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get update
+   sudo apt-get install openjdk-8-jdk
+
+   # CentOS/RHEL
+   sudo yum install java-1.8.0-openjdk-devel
+
+   # Verify Java installation
+   java -version
+   ```
+
+2. Install Conda (if not already installed)
    ```bash
    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
    bash Miniconda3-latest-Linux-x86_64.sh
    ```
 
-2. Create and activate a Conda environment
+3. Create and activate a Conda environment
    ```bash
    conda create -n variant-calling
    conda activate variant-calling
    ```
 
-3. Install dependencies
+4. Install dependencies via Conda
    ```bash
-   conda install -c bioconda snakemake bwa trimmomatic picard gatk4 samtools fastqc
+   conda install -c bioconda snakemake bwa trimmomatic picard samtools
    ```
 
-4. Clone the repository
+5. Install GATK 3.7
    ```bash
-   git clone https://github.com/username/variant-calling-pipeline.git
-   cd variant-calling-pipeline
+   # Create program directory
+   mkdir -p program
+   cd program
+   
+   # Download GATK 3.7
+   wget --no-check-certificate https://tgil.donga.ac.kr/CAPSMaker/GenomeAnalysisTK-nightly.tar.bz2
+   
+   # Extract the downloaded file
+   tar -xjf GenomeAnalysisTK-nightly.tar.bz2
+   
+   cd ..
+   ```
+
+6. Clone the repository
+   ```bash
+   git clone https://github.com/wntjr3364/variant-calling.git
+   cd variant-calling
    ```
 
 ## Preparation
@@ -61,16 +89,16 @@ This Snakemake-based workflow automates the process of genomic variant calling, 
 ### Input Data
 
 Place your sequencing data in the `read/` directory:
-- Paired-end files: `sample_1P.fq.gz` and `sample_2P.fq.gz`
-- Single-end files: `sample.fq.gz`
+- Paired-end files: `read/sample_1.fastq.gz` and `read/sample_2.fastq.gz`
+- Single-end files: `read/sample.fastq.gz`
 
 ## Configuration
 
-Update `config.yaml` with your specific settings:
+Create `config.yaml`:
 
 ```yaml
 reference: "reference/Gmax_275_v2.0.Mt.Pltd.fa"
-known_sites: "reference/known_sites.vcf"
+known_sites: "reference/dbsnp.vcf"
 ```
 
 
@@ -96,11 +124,14 @@ snakemake --cores 8
 ### Run Specific Targets
 
 ```bash
-# Generate alignment for a specific sample
+# Trim reads
+snakemake result/trim/{sample}_trimmed.fastq.gz --cores 8
+
+# Generate alignment
 snakemake result/alignment/sample.bam --cores 8
 
-# Generate variants for a specific sample
-snakemake result/variants/sample.vcf --cores 8
+# Generate variants
+snakemake result/genotype_gvcf/combined_genotyped.vcf.gz --cores 8
 ```
 
 ## Output Directory Structure
@@ -111,9 +142,22 @@ variant-calling-pipeline/
 ├── read/               # Input sequencing data
 ├── log/
 │   ├── trim/           # Trimming logs
-│   ├── alignment/      # Alignment logs
-│   └── variants/       # Variant calling logs
+│   ├── alignment/    # Initial BWA alignments
+│   ├── read_group/   # BAMs with read groups
+│   ├── mark_duplication/  # Deduplicated BAMs
+│   ├── indel_realignment/ # Realigned BAMs
+│   ├── base_recalibration/ # Recalibrated BAMs
+│   ├── haplotype_caller/  # Individual gVCFs
+│   ├── combine_gvcf/     # Combined gVCF
+│   └── genotype_gvcf/    # Final genotyped VCF
 └── result/
-    ├── trim/           # Trimmed reads
-    ├── alignment/      # Aligned BAM files
-    └── variants/       # Variant call VCF files
+    ├── trim/         # Trimmed reads
+    ├── alignment/    # Initial BWA alignments
+    ├── read_group/   # BAMs with read groups
+    ├── mark_duplication/  # Deduplicated BAMs
+    ├── indel_realignment/ # Realigned BAMs
+    ├── base_recalibration/ # Recalibrated BAMs
+    ├── haplotype_caller/  # Individual gVCFs
+    ├── combine_gvcf/     # Combined gVCF
+    └── genotype_gvcf/    # Final genotyped VCF
+```
