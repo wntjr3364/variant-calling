@@ -3,10 +3,17 @@
 # Configurations
 configfile: "config.yaml"
 
-# Get all fastq files
+REFDICT = config["reference_dir"]
+OUTDIR = config["output_dir"]
+LOGDIR = config["log_dir"]
+TEMPDIR = config["temp_dir"]
+
+THREADS = config["threads"]
+MEMORY = config["memory"]
+
+# Sample setup
 ALL_FASTQ, = glob_wildcards("read/{fname}.fastq.gz")
 SAMPLES = []
-THREADS = 8
 
 for fname in ALL_FASTQ:
     samplename = fname.split("_")[0]
@@ -14,46 +21,64 @@ for fname in ALL_FASTQ:
 
 SAMPLES = list(set(SAMPLES))
 
-# Separate rules for single-end and paired-end processing
+# Reference setup
+REFBASE = os.path.basename(config["reference"])
+REFNAME = ".".join(REFBASE.split(".")[:-1])
+REFINDEXES = multiext(REFDICT + os.sep + REFNAME, ".fa.amb", ".fa.ann", ".fa.bwt", ".fa.pac", ".fa.sa", ".fa.fai", ".dict")
+
 rule all:
     input:
         # Reference indexing must complete first
-        multiext("reference/" + config["reference"], ".amb", ".ann", ".bwt", ".pac", ".sa", ".dict", ".fai"),
-
-        # Then process all samples
-        #expand("result/variants/{sample}.g.vcf.gz", sample=SAMPLES),
+        REFINDEXES,
 
         # Final joint calling
-        "result/variants/combined_genotyped.vcf.gz"
+        OUTDIR + os.sep + "genotype_gvcf/combined_genotyped.vcf.gz"
 
-
-rule reference_indexing:
+rule bwa_indexing:
     input:
-        ref="reference/" + config["reference"]
+        ref=REFDICT + os.sep + REFBASE
     output:
-        bwa_amb="reference/" + config["reference"] + ".amb",
-        bwa_ann="reference/" + config["reference"] + ".ann",
-        bwa_bwt="reference/" + config["reference"] + ".bwt",
-        bwa_pac="reference/" + config["reference"] + ".pac",
-        bwa_sa="reference/" + config["reference"] + ".sa",
-        dict="reference/" + config["reference"] + ".dict",
-        fai="reference/" + config["reference"] + ".fai"
-    
+        bwa_amb=REFDICT + os.sep + REFBASE + ".amb",
+        bwa_ann=REFDICT + os.sep + REFBASE + ".ann",
+        bwa_bwt=REFDICT + os.sep + REFBASE + ".bwt",
+        bwa_pac=REFDICT + os.sep + REFBASE + ".pac",
+        bwa_sa=REFDICT + os.sep + REFBASE + ".sa",
     log:
-        bwa="log/indexing_bwa.log",
-        picard="log/indexing_picard.log",
-        samtools="log/indexing_samtools.log"
+        bwa=LOGDIR + os.sep + "indexing_bwa.log"
     shell:
         """
         mkdir -p log
-        
-        # BWA indexing
+
         bwa index -a bwtsw {input.ref} 2> {log.bwa}
+        """
         
-        # Create sequence dictionary
-        gatk CreateSequenceDictionary -R {input.ref} -O {output.dict} 2> {log.picard}
-        
-        # Create FASTA index
+rule picard_indexing:
+    input:
+        ref=REFDICT + os.sep + REFBASE
+    output:
+        dict=REFDICT + os.sep + REFNAME + ".dict"
+    log:
+        picard=LOGDIR + os.sep + "indexing_picard.log"
+    shell:
+        """
+        mkdir -p log
+
+        java -jar program/picard-2.8.3/picard.jar CreateSequenceDictionary \
+        R={input.ref} \
+        O={output.dict} \
+        2> {log.picard}
+        """
+rule samtools_indexing:
+    input:
+        ref=REFDICT + os.sep + REFBASE
+    output:
+        fai=REFDICT + os.sep + REFBASE + ".fai"
+    log:
+        samtools=LOGDIR + os.sep + "indexing_samtools.log"
+    shell:
+        """
+        mkdir -p log
+
         samtools faidx {input.ref} 2> {log.samtools}
         """
 
@@ -61,17 +86,17 @@ ruleorder: trimmomatic_paired_end > trimmomatic_single_end
 # Trimmomatic for Single-End Reads
 rule trimmomatic_single_end:
     input:
-        read="read/{sample}.fastq.gz",
+        read="read/{sample}.fastq.gz"
     output:
-        trimmed="result/trim/{sample}_trimmed.fastq.gz"
+        trimmed=OUTDIR + os.sep + "trim/{sample}_trimmed.fastq.gz"
     log:
-        "log/trim/{sample}.log"
+        LOGDIR + os.sep + "trim/{sample}.log"
     params:
         threads=THREADS,
-        leading=3,
-        trailing=3,
-        slidingwindow="4:5",
-        minlen=90
+        leading=config["trimmomatic"]["leading"],
+        trailing=config["trimmomatic"]["trailing"],
+        slidingwindow=config["trimmomatic"]["slidingwindow"],
+        minlen=config["trimmomatic"]["minlen"]
     shell:
         """
         mkdir -p result/trim
@@ -92,18 +117,18 @@ rule trimmomatic_paired_end:
         read1="read/{sample}_1.fastq.gz",
         read2="read/{sample}_2.fastq.gz",
     output:
-        paired1="result/trim/{sample}_1_trimmed.fastq.gz",
-        unpaired1="result/trim/{sample}_1_untrimmed.fastq.gz",
-        paired2="result/trim/{sample}_2_trimmed.fastq.gz",
-        unpaired2="result/trim/{sample}_2_untrimmed.fastq.gz"
+        paired1=OUTDIR + os.sep + "trim/{sample}_1_trimmed.fastq.gz",
+        unpaired1=OUTDIR + os.sep + "trim/{sample}_1_untrimmed.fastq.gz",
+        paired2=OUTDIR + os.sep + "trim/{sample}_2_trimmed.fastq.gz",
+        unpaired2=OUTDIR + os.sep + "trim/{sample}_2_untrimmed.fastq.gz"
     log:
-        "log/trim/{sample}.log"
+        LOGDIR + os.sep + "trim/{sample}.log"
     params:
         threads=THREADS,
-        leading=3,
-        trailing=3,
-        slidingwindow="4:5",
-        minlen=90
+        leading=config["trimmomatic"]["leading"],
+        trailing=config["trimmomatic"]["trailing"],
+        slidingwindow=config["trimmomatic"]["slidingwindow"],
+        minlen=config["trimmomatic"]["minlen"]
     shell:
         """
         mkdir -p result/trim
@@ -119,150 +144,277 @@ rule trimmomatic_paired_end:
         &> {log}
         """
 
+ruleorder: bwa_alignment_paired_end > bwa_alignment_single_end
 # BWA Alignment for Single-End Reads
 rule bwa_alignment_single_end:
     input:
-        ref="reference/" + config["reference"],
-        reads="result/trim/{sample}_trimmed.fastq.gz",
+        ref=REFDICT + os.sep + REFBASE,
+        reads=OUTDIR + os.sep + "trim/{sample}_trimmed.fastq.gz",
         # Add dependencies on reference indices
-        ref_indices=multiext("reference/" + config["reference"], 
-            ".amb", ".ann", ".bwt", ".pac", ".sa", ".dict", ".fai")
+        ref_indices=REFINDEXES
     output:
-        bam="result/alignment/{sample}.bam"
+        bam=OUTDIR + os.sep + "alignment/{sample}.bam"
     log:
-        "log/bwa/{sample}.log"
+        bwa=LOGDIR + os.sep + "bwa/{sample}_bwa.log",
+        samtools=LOGDIR + os.sep + "bwa/{sample}_samtools.log"
     params:
         threads=THREADS,
     shell:
         """
         mkdir -p result/alignment
 
-        bwa mem -t {params.threads} {input.ref} {input.reads} 2> {log} | \
-        samtools sort -@ 8 -o {output.bam}
+        bwa mem -t {params.threads} {input.ref} {input.reads} 2> {log.bwa} | \
+        samtools sort -@ {params.threads} -o {output.bam} &> {log.samtools}
         """
 
-ruleorder: bwa_alignment_paired_end > bwa_alignment_single_end
 # BWA Alignment for Paired-End Reads
 rule bwa_alignment_paired_end:
     input:
-        ref="reference/" + config["reference"],
-        reads=["result/trim/{sample}_1_trimmed.fastq.gz", "result/trim/{sample}_2_trimmed.fastq.gz"],
+        ref=REFDICT + os.sep + config["reference"],
+        reads=[OUTDIR + os.sep + "trim/{sample}_1_trimmed.fastq.gz", OUTDIR + os.sep + "trim/{sample}_2_trimmed.fastq.gz"],
         # Add dependencies on reference indices
-        ref_indices=multiext("reference/" + config["reference"], 
-            ".amb", ".ann", ".bwt", ".pac", ".sa", ".dict", ".fai")
+        ref_indices=REFINDEXES
     output:
-        bam="result/alignment/{sample}.bam"
+        bam=OUTDIR + os.sep + "alignment/{sample}.bam"
     log:
-        "log/bwa/{sample}.log"
+        bwa=LOGDIR + os.sep + "bwa/{sample}_bwa.log",
+        samtools=LOGDIR + os.sep + "bwa/{sample}_samtools.log"
     params:
         threads=THREADS,
     shell:
         """
         mkdir -p result/alignment
 
-        bwa mem -t {params.threads} {input.ref} {input.reads} 2> {log} | \
-        samtools sort -@ 8 -o {output.bam}
+        bwa mem -t {params.threads} {input.ref} {input.reads} 2> {log.bwa} | \
+        samtools sort -@ {params.threads} -o {output.bam} &> {log.samtools}
         """
 
-# Picard Mark Duplicates (works for both SE and PE)
-rule mark_duplicates:
+rule read_group:
     input:
-        bam="result/alignment/{sample}.bam",
+        bam=OUTDIR + os.sep + "alignment/{sample}.bam"
     output:
-        marked_bam="result/alignment/{sample}_marked.bam",
-        metrics="result/alignment/{sample}_marked_metrics.txt"
+        rg_bam=OUTDIR + os.sep + "read_group/{sample}.RGsorted.bam"
+    params:
+        java_mem="10g",
+        tmp_dir=TEMPDIR,
+        max_records="1280000"
+    log:
+        LOGDIR + os.sep + "read_group/{sample}.RGsorted.log"
     shell:
         """
-        mkdir -p result/alignment
+        mkdir -p result/read_group log/read_group {params.tmp_dir}
 
-        gatk MarkDuplicates \
+        picard AddOrReplaceReadGroups \
+        -Xmx{params.java_mem} \
+        -Djava.io.tmpdir={params.tmp_dir} \
+        INPUT={input.bam} \
+        OUTPUT={output.rg_bam} \
+        SORT_ORDER=coordinate \
+        MAX_RECORDS_IN_RAM={params.max_records} \
+        VALIDATION_STRINGENCY=LENIENT \
+        RGID={wildcards.sample} \
+        RGLB={wildcards.sample}_LIB \
+        RGPL=ILLUMINA \
+        RGPU=NONE \
+        RGSM={wildcards.sample} \
+        &> {log}
+        """
+
+rule mark_duplicates:
+    input:
+        bam=OUTDIR + os.sep + "read_group/{sample}.RGsorted.bam"
+    output:
+        marked_bam=OUTDIR + os.sep + "mark_duplication/{sample}_marked.bam",
+        metrics=OUTDIR + os.sep + "mark_duplication/{sample}_marked_metrics.txt",
+        bam_index=OUTDIR + os.sep + "mark_duplication/{sample}_marked.bam.bai"
+    params:
+        java_mem="10g",
+        tmp_dir=TEMPDIR,
+        max_records="1280000",
+        max_handles="1024"
+    log:
+        dedup=LOGDIR + os.sep + "mark_duplication/{sample}.dedup.log",
+        index=LOGDIR + os.sep + "mark_duplication/{sample}.index.log"
+    shell:
+        """
+        mkdir -p result/mark_duplication log/mark_duplication {params.tmp_dir}
+
+        picard -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        MarkDuplicates \
+        INPUT={input.bam} \
+        OUTPUT={output.marked_bam} \
+        METRICS_FILE={output.metrics} \
+        REMOVE_DUPLICATES=true \
+        ASSUME_SORTED=true \
+        MAX_RECORDS_IN_RAM={params.max_records} \
+        VALIDATION_STRINGENCY=LENIENT \
+        MAX_FILE_HANDLES={params.max_handles} \
+        &> {log.dedup} 
+
+        samtools index {output.marked_bam} &> {log.index}
+        """
+
+# Indel Realignment (works for both SE and PE)
+rule indel_realignment:
+    input:
+        bam=OUTDIR + os.sep + "mark_duplication/{sample}_marked.bam",
+        ref=REFDICT + os.sep + REFBASE,
+        known_sites=REFDICT + os.sep + config["known_sites"]
+    output:
+        realigned_bam=OUTDIR + os.sep + "indel_realignment/{sample}_realigned.bam",
+        intervals=OUTDIR + os.sep + "indel_realignment/{sample}.intervals"
+    params:
+        java_mem=MEMORY,
+        tmp_dir=TEMPDIR,
+        threads=THREADS
+    log:
+        target=LOGDIR + os.sep + "indel_realignment/{sample}.target.log",
+        realign=LOGDIR + os.sep + "indel_realignment/{sample}.realigned.log"
+    shell:
+        """
+        mkdir -p result/indel_realignment log/indel_realignment {params.tmp_dir}
+
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        -jar program/GenomeAnalysisTK.jar \
+        -T RealignerTargetCreator \
+        -R {input.ref} \
         -I {input.bam} \
-        -O {output.marked_bam} \
-        -M {output.metrics}
+        -o {output.intervals} \
+        -nt {params.threads} \
+        &> {log.target}
+
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        -jar program/GenomeAnalysisTK.jar \
+        -T IndelRealigner \
+        -R {input.ref} \
+        -I {input.bam} \
+        -targetIntervals {output.intervals} \
+        -o {output.realigned_bam} \
+        &> {log.realign}
         """
 
 # Base Quality Score Recalibration (works for both SE and PE)
 rule base_recalibration:
     input:
-        bam="result/alignment/{sample}_marked.bam",
-        ref="reference/" + config["reference"],
-        known_sites="reference/" + config["known_sites"],
+        bam=OUTDIR + os.sep + "indel_realignment/{sample}_realigned.bam",
+        ref=REFDICT + os.sep + REFBASE,
+        known_sites=REFDICT + os.sep + config["known_sites"]
     output:
-        recal_table="result/alignment/{sample}_recal_data.table",
-        recal_bam="result/alignment/{sample}_recal.bam"
+        recal_table=OUTDIR + os.sep + "base_recalibration/{sample}_recal_data.table",
+        recal_bam=OUTDIR + os.sep + "base_recalibration/{sample}_recal.bam"
+    params:
+        java_mem=MEMORY,
+        tmp_dir=TEMPDIR,
+        threads=THREADS
+    log:
+        LOGDIR + os.sep + "base_recalibration/{sample}.recal.log"
     shell:
         """
-        mkdir -p result/alignment
+        mkdir -p result/base_recalibration log/base_recalibration {params.tmp_dir}
 
-        gatk BaseRecalibrator \
-        -I {input.bam} \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        -jar program/GenomeAnalysisTK.jar \
+        -T BaseRecalibrator \
         -R {input.ref} \
-        --known-sites {input.known_sites} \
-        -O {output.recal_table}
+        -I {input.bam} \
+        -knownSites {input.known_sites} \
+        -o {output.recal_table} \
+        -nct {params.threads} \
+        &> {log}
         
-        gatk ApplyBQSR \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        -jar program/GenomeAnalysisTK.jar \
+        -T PrintReads \
         -R {input.ref} \
         -I {input.bam} \
-        --bqsr-recal-file {output.recal_table} \
-        -O {output.recal_bam}
+        -BQSR {output.recal_table} \
+        -o {output.recal_bam} \
+        -nct {params.threads} \
+        &>> {log}
         """
 
-# HaplotypeCaller in GVCF mode (works for both SE and PE)
 rule haplotype_caller_gvcf:
     input:
-        bam="result/alignment/{sample}_recal.bam",
-        ref="reference/" + config["reference"],
+        bam=OUTDIR + os.sep + "base_recalibration/{sample}_recal.bam",
+        ref=REFDICT + os.sep + REFBASE
     output:
-        gvcf="result/variants/{sample}.g.vcf.gz",
-        gvcf_index="result/variants/{sample}.g.vcf.gz.tbi"
+        gvcf=OUTDIR + os.sep + "haplotype_caller/{sample}.g.vcf.gz",
+        gvcf_index=OUTDIR + os.sep + "haplotype_caller/{sample}.g.vcf.gz.tbi"
+    params:
+        java_mem=MEMORY,
+        tmp_dir=TEMPDIR,
+        threads=THREADS
+    log:
+        LOGDIR + os.sep + "haplotype_caller/{sample}.log"
     shell:
         """
-        mkdir -p result/variants
+        mkdir -p result/haplotype_caller log/haplotype_caller {params.tmp_dir}
 
-        gatk HaplotypeCaller \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        -jar program/GenomeAnalysisTK.jar \
+        -T HaplotypeCaller \
         -R {input.ref} \
         -I {input.bam} \
-        -O {output.gvcf} \
-        -ERC GVCF
+        -o {output.gvcf} \
+        -ERC GVCF \
+        -nct {params.threads} \
+        &> {log}
         """
 
-# CombineGVCFs (combines both SE and PE samples)
-rule combine_gvcfs:
+# CombineGVCFs
+rule combine_gvcf:
     input:
-        ref="reference/" + config["reference"],
-        gvcfs=expand("result/variants/{sample}.g.vcf.gz", sample=SAMPLES),
+        ref=REFDICT + os.sep + REFBASE,
+        gvcfs=expand(OUTDIR + os.sep + "haplotype_caller/{sample}.g.vcf.gz", sample=SAMPLES),
     output:
-        combined_gvcf="result/variants/combined.g.vcf.gz"
+        combined_gvcf=OUTDIR + os.sep + "combine_gvcf/combined.g.vcf.gz"
     params:
         variant_inputs=lambda wildcards, input: " ".join(f"-V {v}" for v in input.gvcfs)
+    log:
+        LOGDIR + os.sep + "combine_gvcf.log"
     shell:
         """
-        mkdir -p result/variants
+        mkdir -p result/combine_gvcf log/combine_gvcf
 
-        gatk CombineGVCFs \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        -jar program/GenomeAnalysisTK.jar \
+        -T CombineGVCFs \
         -R {input.ref} \
         {params.variant_inputs} \
-        -O {output.combined_gvcf}
+        -o {output.combined_gvcf} \
+        &> {log}
         """
 
 # GenotypeGVCFs
-rule genotype_gvcfs:
+rule genotype_gvcf:
     input:
-        combined_gvcf="result/variants/combined.g.vcf.gz",
-        ref="reference/" + config["reference"],
+        combined_gvcf=OUTDIR + os.sep + "combine_gvcf/combined.g.vcf.gz",
+        ref=REFDICT + os.sep + REFBASE,
+        dbsnp=REFDICT + os.sep + config["known_sites"]
     output:
-        genotyped_vcf="result/variants/combined_genotyped.vcf.gz"
+        genotyped_vcf=OUTDIR + os.sep + "genotype_gvcf/combined_genotyped.vcf.gz"
     params:
+        java_mem="30g",
+        tmp_dir=TEMPDIR,
+        threads=THREADS,
         stand_call_conf=config["variant_calling"]["stand_call_conf"],
         max_alternate_alleles=config["variant_calling"]["max_alternate_alleles"]
+    log:
+        LOGDIR + os.sep + "genotype_gvcf/genotype.log"
     shell:
         """
-        mkdir -p result/variants
+        mkdir -p result/genotype_gvcf log/genotype_gvcf {params.tmp_dir}
 
-        gatk GenotypeGVCFs \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        -jar program/GenomeAnalysisTK.jar \
+        -T GenotypeGVCFs \
         -R {input.ref} \
         -V {input.combined_gvcf} \
-        -O {output.genotyped_vcf} \
-        --standard-min-confidence-threshold-for-calling {params.stand_call_conf} \
-        --max-alternate-alleles {params.max_alternate_alleles}
+        -o {output.genotyped_vcf} \
+        --dbsnp {input.dbsnp} \
+        --stand_call_conf {params.stand_call_conf} \
+        --max_alternate_alleles {params.max_alternate_alleles} \
+        -nt {params.threads} \
+        &> {log}
         """
+        
