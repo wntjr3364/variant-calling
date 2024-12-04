@@ -138,26 +138,28 @@ snakemake result/genotype_gvcf/combined_genotyped.vcf.gz --cores 8
 
 ```
 variant-calling-pipeline/
+├── snakefile           # Snakemake workflow definition
+├── config.yaml         # Pipeline configuration file
 ├── reference/          # Reference genome files
 ├── read/               # Input sequencing data
-├── log/
-│   ├── trim/           # Trimming logs
-│   ├── alignment/    # Initial BWA alignments
-│   ├── read_group/   # BAMs with read groups
-│   ├── mark_duplication/  # Deduplicated BAMs
-│   ├── indel_realignment/ # Realigned BAMs
-│   ├── base_recalibration/ # Recalibrated BAMs
-│   ├── haplotype_caller/  # Individual gVCFs
-│   ├── combine_gvcf/     # Combined gVCF
-│   └── genotype_gvcf/    # Final genotyped VCF
-└── result/
-    ├── trim/         # Trimmed reads
-    ├── alignment/    # Initial BWA alignments
-    ├── read_group/   # BAMs with read groups
-    ├── mark_duplication/  # Deduplicated BAMs
-    ├── indel_realignment/ # Realigned BAMs
-    ├── base_recalibration/ # Recalibrated BAMs
-    ├── haplotype_caller/  # Individual gVCFs
-    ├── combine_gvcf/     # Combined gVCF
-    └── genotype_gvcf/    # Final genotyped VCF
+├── log/                # Workflow log files
+│   ├── trim/           # Trimming process logs
+│   ├── alignment/      # BWA alignment logs
+│   ├── read_group/     # Read group assignment logs
+│   ├── mark_duplication/  # Duplicate marking logs
+│   ├── indel_realignment/ # Indel realignment logs
+│   ├── base_recalibration/ # Base quality recalibration logs
+│   ├── haplotype_caller/  # Haplotype caller logs
+│   ├── combine_gvcf/     # Combined gVCF logs
+│   └── genotype_gvcf/    # Final genotyped VCF logs
+└── result/             # Output files
+    ├── trim/           # Trimmed read files
+    ├── alignment/      # Alignment BAM files
+    ├── read_group/     # Read group-annotated BAMs
+    ├── mark_duplication/  # Deduplicated BAM files
+    ├── indel_realignment/ # Realigned BAM files
+    ├── base_recalibration/ # Recalibrated BAM files
+    ├── haplotype_caller/  # Individual gVCF files
+    ├── combine_gvcf/     # Combined gVCF file
+    └── genotype_gvcf/    # Final genotyped VCF file
 ```
