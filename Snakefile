@@ -63,7 +63,7 @@ rule picard_indexing:
         """
         mkdir -p log
 
-        java -jar program/picard-2.8.3/picard.jar CreateSequenceDictionary \
+        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -jar program/picard-2.8.3/picard.jar CreateSequenceDictionary \
         R={input.ref} \
         O={output.dict} \
         2> {log.picard}
@@ -274,7 +274,7 @@ rule indel_realignment:
         """
         mkdir -p result/indel_realignment log/indel_realignment {params.tmp_dir}
 
-        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T RealignerTargetCreator \
         -R {input.ref} \
@@ -283,7 +283,7 @@ rule indel_realignment:
         -nt {params.threads} \
         &> {log.target}
 
-        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T IndelRealigner \
         -R {input.ref} \
@@ -312,7 +312,7 @@ rule base_recalibration:
         """
         mkdir -p result/base_recalibration log/base_recalibration {params.tmp_dir}
 
-        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T BaseRecalibrator \
         -R {input.ref} \
@@ -322,7 +322,7 @@ rule base_recalibration:
         -nct {params.threads} \
         &> {log}
         
-        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T PrintReads \
         -R {input.ref} \
@@ -350,7 +350,7 @@ rule haplotype_caller_gvcf:
         """
         mkdir -p result/haplotype_caller log/haplotype_caller {params.tmp_dir}
 
-        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T HaplotypeCaller \
         -R {input.ref} \
@@ -373,12 +373,12 @@ rule combine_gvcf:
         java_mem=MEMORY,
         tmp_dir=TEMPDIR
     log:
-        LOGDIR + os.sep + "combine_gvcf.log"
+        LOGDIR + os.sep + "combine_gvcf/combine_gvcf.log"
     shell:
         """
-        mkdir -p result/combine_gvcf log/combine_gvcf
+        mkdir -p result/combine_gvcf log/combine_gvcf {params.tmp_dir}
 
-        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T CombineGVCFs \
         -R {input.ref} \
@@ -396,18 +396,18 @@ rule genotype_gvcf:
     output:
         genotyped_vcf=OUTDIR + os.sep + "genotype_gvcf/combined_genotyped.vcf.gz"
     params:
-        java_mem="30g",
+        java_mem=MEMORY,
         tmp_dir=TEMPDIR,
         threads=THREADS,
         stand_call_conf=config["variant_calling"]["stand_call_conf"],
         max_alternate_alleles=config["variant_calling"]["max_alternate_alleles"]
     log:
-        LOGDIR + os.sep + "genotype_gvcf/genotype.log"
+        LOGDIR + os.sep + "genotype_gvcf/genotype_gvcf.log"
     shell:
         """
         mkdir -p result/genotype_gvcf log/genotype_gvcf {params.tmp_dir}
 
-        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T GenotypeGVCFs \
         -R {input.ref} \
