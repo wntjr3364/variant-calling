@@ -3,6 +3,12 @@
 reference: "Gmax_275_v2.0.Mt.Pltd.fa"
 known_sites: "dbsnp.vcf"
 
+# Set the dictionaries
+reference_dir: "reference"
+output_dir: "result"
+log_dir: "log"
+temp_dir: "tmp"
+
 # Variant Calling Parameters
 variant_calling:
   stand_call_conf: 30
@@ -18,5 +24,5 @@ trimmomatic:
   minlen: 90
 
 # Resource Parameters
-threads: 8
+threads: 20
 memory: "16g"
