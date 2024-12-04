@@ -369,7 +369,9 @@ rule combine_gvcf:
     output:
         combined_gvcf=OUTDIR + os.sep + "combine_gvcf/combined.g.vcf.gz"
     params:
-        variant_inputs=lambda wildcards, input: " ".join(f"-V {v}" for v in input.gvcfs)
+        variant_inputs=lambda wildcards, input: " ".join(f"-V {v}" for v in input.gvcfs),
+        java_mem=MEMORY,
+        tmp_dir=TEMPDIR
     log:
         LOGDIR + os.sep + "combine_gvcf.log"
     shell:
