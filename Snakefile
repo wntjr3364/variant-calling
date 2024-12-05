@@ -424,21 +424,24 @@ rule variant_filtering:
         vcf=OUTDIR + os.sep + "genotype_gvcf/combined_genotyped.vcf.gz",
         ref=REFDICT + os.sep + REFBASE
     output:
-        filtered_vcf=OUTDIR + os.sep + "filtered_variants/filtered_snps.vcf.gz"
+        temp_vcf=temp(OUTDIR + os.sep + "filtered_variants/filtered_temp.vcf.gz"),
+        temp_vcf_tbi=temp(OUTDIR + os.sep + "filtered_variants/filtered_temp.vcf.gz.tbi"),
+        filtered_vcf=OUTDIR + os.sep + "filtered_variants/filtered_snps.vcf.gz",
+        filtered_vcf_tbi=OUTDIR + os.sep + "filtered_variants/filtered_snps.vcf.gz.tbi"
     params:
         java_mem=MEMORY,
         tmp_dir=TEMPDIR,
-        # Updated filter expressions
-        filter_expression='"QD < 5.0 || FS >= 30.0 || SOR >= 3.0 || MQ <= 30.0 || MQRankSum < -3.5 || MQRankSum > 3.5 || ReadPosRankSum < -2.0 || ReadPosRankSum > 2.0"',
+        filter_expression='"QD < 5.0 || FS >= 30.0 || SOR >= 3.0 || MQ <= 30.0 || MQRankSum < -3.5 || MQRankSum > 3.5 || ReadPosRankSum < -2.0 || ReadPosRankSum > 2.0 || DP < 10 || GQ < 20"',
         filter_name='"basic_snp_filter"',
         maf_threshold="0.05"
     log:
-        LOGDIR + os.sep + "filtered_variants/filtering.log"
+        gatk=LOGDIR + os.sep + "filtered_variants/filtering_gatk.log",
+        bcftools=LOGDIR + os.sep + "filtered_variants/filtering_bcftools.log"
     shell:
         """
         mkdir -p result/filtered_variants log/filtered_variants {params.tmp_dir}
 
-        # First apply quality filters
+        # Apply GATK quality filters
         java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T VariantFiltration \
@@ -446,12 +449,17 @@ rule variant_filtering:
         -V {input.vcf} \
         --filterExpression {params.filter_expression} \
         --filterName {params.filter_name} \
-        -o filtered_temp.vcf.gz \
-        &> {log}
+        -o {output.temp_vcf} \
+        &> {log.gatk}
 
-        # Then apply MAF filter using bcftools
-        bcftools view -i 'AF>={params.maf_threshold}' filtered_temp.vcf.gz -Oz -o {output.filtered_vcf} 2>> {log}
 
-        # Clean up temporary file
-        rm filtered_temp.vcf.gz
+        # Apply MAF filter and create final VCF
+        bcftools view \
+        -i 'AF>={params.maf_threshold} && FILTER="PASS"' \
+        {output.temp_vcf} \
+        -Oz -o {output.filtered_vcf} \
+        2> {log.bcftools}
+
+        # Index the final filtered VCF
+        tabix -p vcf {output.filtered_vcf}
         """
