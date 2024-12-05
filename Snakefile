@@ -409,14 +409,14 @@ rule genotype_gvcf:
 
         /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
+        -nt {params.threads} \
         -T GenotypeGVCFs \
         -R {input.ref} \
         -V {input.combined_gvcf} \
         -o {output.genotyped_vcf} \
         --dbsnp {input.dbsnp} \
-        --stand_call_conf {params.stand_call_conf} \
-        --max_alternate_alleles {params.max_alternate_alleles} \
-        -nt {params.threads} \
+        -stand_call_conf {params.stand_call_conf} \
+        -maxAltAlleles {params.max_alternate_alleles} \
         &> {log}
         """
         
