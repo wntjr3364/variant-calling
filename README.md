@@ -11,6 +11,7 @@ This Snakemake-based workflow provides an automated and comprehensive solution f
 - [Snakemake](https://snakemake.readthedocs.io/)
 - [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)
 - [SAMtools](http://www.htslib.org/)
+- [BCFtools](http://www.htslib.org/doc/bcftools.html)
 - [BWA](http://bio-bwa.sourceforge.net/)
 - [Picard](https://broadinstitute.github.io/picard/)
 - [GATK](https://gatk.broadinstitute.org/)
@@ -52,7 +53,7 @@ This Snakemake-based workflow provides an automated and comprehensive solution f
 
 4. Install dependencies via Conda
    ```bash
-   conda install -c bioconda snakemake bwa trimmomatic picard samtools
+   conda install -c bioconda snakemake bwa trimmomatic picard samtools bcftools
    ```
 
 5. Install GATK 3.7
@@ -112,7 +113,8 @@ known_sites: "reference/dbsnp.vcf"
 6. Base Quality Score Recalibration (GATK)
 7. Variant Calling (GATK)
 8. Joint Variant Calling (GATK)
-
+9. Variant Filtering
+ 
 ## Usage
 
 ### Run Full Pipeline
@@ -125,7 +127,7 @@ snakemake --cores 8
 
 ```bash
 # Trim reads
-snakemake result/trim/{sample}_trimmed.fastq.gz --cores 8
+snakemake result/trim/sample_trimmed.fastq.gz --cores 8
 
 # Generate alignment
 snakemake result/alignment/sample.bam --cores 8
@@ -151,7 +153,8 @@ variant-calling-pipeline/
 │   ├── base_recalibration/ # Base quality recalibration logs
 │   ├── haplotype_caller/  # Haplotype caller logs
 │   ├── combine_gvcf/     # Combined gVCF logs
-│   └── genotype_gvcf/    # Final genotyped VCF logs
+│   ├── genotype_gvcf/    # Final genotyped VCF logs
+│   └── filtered_variants/ # Filtered variant files
 └── result/             # Output files
     ├── trim/           # Trimmed read files
     ├── alignment/      # Alignment BAM files
@@ -161,5 +164,6 @@ variant-calling-pipeline/
     ├── base_recalibration/ # Recalibrated BAM files
     ├── haplotype_caller/  # Individual gVCF files
     ├── combine_gvcf/     # Combined gVCF file
-    └── genotype_gvcf/    # Final genotyped VCF file
+    ├── genotype_gvcf/    # Final genotyped VCF file
+    └── filtered_variants/ # Filtered variant files
 ```
