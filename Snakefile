@@ -30,9 +30,8 @@ rule all:
     input:
         # Reference indexing must complete first
         REFINDEXES,
-
-        # Final joint calling
-        OUTDIR + os.sep + "genotype_gvcf/combined_genotyped.vcf.gz"
+        # Final filtered variants
+        OUTDIR + os.sep + "filtered_variants/filtered_snps.vcf.gz"
 
 rule bwa_indexing:
     input:
@@ -63,7 +62,7 @@ rule picard_indexing:
         """
         mkdir -p log
 
-        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -jar program/picard-2.8.3/picard.jar CreateSequenceDictionary \
+        java -jar program/picard-2.8.3/picard.jar CreateSequenceDictionary \
         R={input.ref} \
         O={output.dict} \
         2> {log.picard}
@@ -274,7 +273,7 @@ rule indel_realignment:
         """
         mkdir -p result/indel_realignment log/indel_realignment {params.tmp_dir}
 
-        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T RealignerTargetCreator \
         -R {input.ref} \
@@ -283,7 +282,7 @@ rule indel_realignment:
         -nt {params.threads} \
         &> {log.target}
 
-        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T IndelRealigner \
         -R {input.ref} \
@@ -312,7 +311,7 @@ rule base_recalibration:
         """
         mkdir -p result/base_recalibration log/base_recalibration {params.tmp_dir}
 
-        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T BaseRecalibrator \
         -R {input.ref} \
@@ -322,7 +321,7 @@ rule base_recalibration:
         -nct {params.threads} \
         &> {log}
         
-        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T PrintReads \
         -R {input.ref} \
@@ -350,7 +349,7 @@ rule haplotype_caller_gvcf:
         """
         mkdir -p result/haplotype_caller log/haplotype_caller {params.tmp_dir}
 
-        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T HaplotypeCaller \
         -R {input.ref} \
@@ -378,7 +377,7 @@ rule combine_gvcf:
         """
         mkdir -p result/combine_gvcf log/combine_gvcf {params.tmp_dir}
 
-        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -T CombineGVCFs \
         -R {input.ref} \
@@ -407,7 +406,7 @@ rule genotype_gvcf:
         """
         mkdir -p result/genotype_gvcf log/genotype_gvcf {params.tmp_dir}
 
-        /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el9.x86_64/jre/bin/java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
         -jar program/GenomeAnalysisTK.jar \
         -nt {params.threads} \
         -T GenotypeGVCFs \
@@ -419,4 +418,40 @@ rule genotype_gvcf:
         -maxAltAlleles {params.max_alternate_alleles} \
         &> {log}
         """
-        
+
+rule variant_filtering:
+    input:
+        vcf=OUTDIR + os.sep + "genotype_gvcf/combined_genotyped.vcf.gz",
+        ref=REFDICT + os.sep + REFBASE
+    output:
+        filtered_vcf=OUTDIR + os.sep + "filtered_variants/filtered_snps.vcf.gz"
+    params:
+        java_mem=MEMORY,
+        tmp_dir=TEMPDIR,
+        # Updated filter expressions
+        filter_expression='"QD < 5.0 || FS >= 30.0 || SOR >= 3.0 || MQ <= 30.0 || MQRankSum < -3.5 || MQRankSum > 3.5 || ReadPosRankSum < -2.0 || ReadPosRankSum > 2.0"',
+        filter_name='"basic_snp_filter"',
+        maf_threshold="0.05"
+    log:
+        LOGDIR + os.sep + "filtered_variants/filtering.log"
+    shell:
+        """
+        mkdir -p result/filtered_variants log/filtered_variants {params.tmp_dir}
+
+        # First apply quality filters
+        java -Xmx{params.java_mem} -Djava.io.tmpdir={params.tmp_dir} \
+        -jar program/GenomeAnalysisTK.jar \
+        -T VariantFiltration \
+        -R {input.ref} \
+        -V {input.vcf} \
+        --filterExpression {params.filter_expression} \
+        --filterName {params.filter_name} \
+        -o filtered_temp.vcf.gz \
+        &> {log}
+
+        # Then apply MAF filter using bcftools
+        bcftools view -i 'AF>={params.maf_threshold}' filtered_temp.vcf.gz -Oz -o {output.filtered_vcf} 2>> {log}
+
+        # Clean up temporary file
+        rm filtered_temp.vcf.gz
+        """
